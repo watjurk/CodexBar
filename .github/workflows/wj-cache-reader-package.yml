@@ -1,0 +1,31 @@
+name: Preserve approved cache reader package
+
+on:
+  push:
+    branches: [perf/reuse-codex-file-details]
+    paths: [.github/workflows/wj-cache-reader-package.yml]
+
+permissions: {}
+
+jobs:
+  preserve:
+    if: github.repository == 'watjurk/CodexBar'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Preserve the exact approved and installed artifact
+        run: |
+          set -euo pipefail
+          source_sha=$(gh run view 43947008642 --repo watjurk/CodexBar --json headSha --jq .headSha)
+          test "$source_sha" = 39b5de5be29c5311f2df1895d3728d990988255b
+          gh run download 43947008642 --repo watjurk/CodexBar --name CodexBar-cache-reader-test-arm64
+          echo 'c18942bd20b4ba81cd2a184866ceba48be4e406fa3c3c3a82353299dfaf2c9f0  CodexBar-cache-reader-test.zip' | sha256sum -c -
+          gh release create wj-cache-reader-0.84.0-39b5de5 CodexBar-cache-reader-test.zip \
+            --repo watjurk/CodexBar --target "$source_sha" --prerelease \
+            --title 'CodexBar 0.84.0 — approved local cache reader patch' \
+            --notes 'Arm64 ad-hoc signed build, without a vendor TeamIdentifier. Exact artifact from successful run 43947008642, source 39b5de5be29c5311f2df1895d3728d990988255b. Reuses validated file details; no account data or private cache included. This fork-only package is pinned by wjsetup; no Sparkle feed or upstream publication.'
