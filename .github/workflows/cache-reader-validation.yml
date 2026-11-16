@@ -1,0 +1,34 @@
+name: Cache reader app validation
+
+on:
+  push:
+    branches: [perf/reuse-codex-file-details]
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    if: github.repository == 'watjurk/CodexBar'
+    runs-on: xcode-27
+    timeout-minutes: 90
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Test cache store with full app targets
+        run: swift test --filter CostUsageStore
+      - name: Package isolated arm64 app without developer keys
+        env:
+          ARCHES: arm64
+          CODEXBAR_SIGNING: adhoc
+        run: |
+          ./Scripts/package_app.sh release
+          codesign --verify --deep --strict CodexBar.app
+          ditto -c -k --keepParent CodexBar.app CodexBar-cache-reader-test.zip
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: CodexBar-cache-reader-test-arm64
+          path: CodexBar-cache-reader-test.zip
+          if-no-files-found: error
+          retention-days: 7
