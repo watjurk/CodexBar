@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: cache-reader-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   app:
     if: github.repository == 'watjurk/CodexBar'
