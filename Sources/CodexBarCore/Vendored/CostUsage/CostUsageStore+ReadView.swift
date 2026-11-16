@@ -336,6 +336,7 @@ extension CostUsageStore {
                 recorder: recorder,
                 retryPresence: retryPresence,
                 decodedUsageRows: usageRows?.rowsByPath,
+                decodedFileDetails: usageRows?.detailsByPath,
                 // Only scanner reconciliation and report turn performance read the request ledger.
                 includesRequestLedgerState: purpose == .report)
             let persistence = CodexPersistenceState(snapshot: snapshot, rowCounts: usageRows?.rowCounts)

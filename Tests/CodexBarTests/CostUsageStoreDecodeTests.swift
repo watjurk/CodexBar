@@ -4,6 +4,41 @@ import Testing
 
 extension CostUsageStoreReadWorkTests {
     @Test
+    func `validated file details are reused without changing malformed record handling`() async throws {
+        let fixture = try ReadWorkFixture(fileCount: 3, rowsPerFile: 4, incomplete: true)
+        defer { fixture.remove() }
+        var snapshot = await fixture.store.readSnapshot()
+        var invalid = try #require(snapshot.files.first)
+        invalid.path += ".invalid"
+        invalid.scanState.detailsPayload = Data("invalid JSON".utf8)
+        snapshot.files.append(invalid)
+        let expected = CostUsageStore.decodeCodexCache(from: snapshot, recorder: nil)
+        var details: [String: CostUsageStore.StoredFileDetails] = [:]
+        for file in snapshot.files {
+            if let data = file.scanState.detailsPayload,
+               let decoded = try? JSONDecoder().decode(CostUsageStore.StoredFileDetails.self, from: data)
+            {
+                details[file.path] = decoded
+            }
+        }
+        let restored = CostUsageStore.decodeCodexCache(
+            from: snapshot, recorder: nil, decodedFileDetails: details)
+        #expect(restored == expected)
+        #expect(restored.files[invalid.path] == nil)
+        let validPath = try #require(details.keys.first)
+        var missingDetails = details
+        missingDetails.removeValue(forKey: validPath)
+        #expect(CostUsageStore.decodeCodexCache(
+            from: snapshot, recorder: nil, decodedFileDetails: missingDetails).files[validPath] == nil)
+        // Reuse must not fall back to re-reading mutable/original payloads.
+        for index in snapshot.files.indices {
+            snapshot.files[index].scanState.detailsPayload = Data("not read".utf8)
+        }
+        #expect(CostUsageStore.decodeCodexCache(
+            from: snapshot, recorder: nil, decodedFileDetails: details) == expected)
+    }
+
+    @Test
     func `large decode preserves every persisted field with one decoder`() async throws {
         let fixture = try ReadWorkFixture(fileCount: 1, rowsPerFile: 4, incomplete: true)
         defer { fixture.remove() }
