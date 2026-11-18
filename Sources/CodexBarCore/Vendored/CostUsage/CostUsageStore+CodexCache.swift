@@ -34,7 +34,8 @@ extension CostUsageStore {
                 from: loaded.snapshot,
                 recorder: recorder,
                 tokenSnapshotsLoaded: loadTokenSnapshots,
-                decodedUsageRows: loaded.rows.rowsByPath),
+                decodedUsageRows: loaded.rows.rowsByPath,
+                decodedFileDetails: loaded.rows.detailsByPath),
             persistence: CodexPersistenceState(snapshot: loaded.snapshot, rowCounts: loaded.rows.rowCounts))
     }
 
@@ -50,8 +51,9 @@ extension CostUsageStore {
         let rowStrings = CostUsageRowStringPool()
         let readablePaths = Set(files.compactMap { file -> String? in
             guard let data = file.scanState.detailsPayload,
-                  (try? decoder.decode(StoredFileDetails.self, from: data)) != nil
+                  let details = try? decoder.decode(StoredFileDetails.self, from: data)
             else { return nil }
+            decoded.detailsByPath[file.path] = details
             return file.path
         })
         var decodeAttempts = 0
@@ -319,7 +321,7 @@ extension CostUsageStore {
 // MARK: - Cache conversion
 
 extension CostUsageStore {
-    private struct StoredFileDetails: Codable {
+    struct StoredFileDetails: Codable {
         var lastTotals: CostUsageCodexTotals?
         var projectPath: String?
         var canonicalProjectPath: String?
@@ -412,6 +414,7 @@ extension CostUsageStore {
         tokenSnapshotsLoaded: Bool = true,
         unloadedTokenSnapshotPathRecorder: ((String) -> Void)? = nil,
         decodedUsageRows: [String: [CostUsageScanner.CodexUsageRow]]? = nil,
+        decodedFileDetails: [String: StoredFileDetails]? = nil,
         includesRequestLedgerState: Bool = true,
         makeDecoder: () -> JSONDecoder = JSONDecoder.init) -> CostUsageCache
     {
@@ -462,10 +465,12 @@ extension CostUsageStore {
             // Source-aware dispatch (#4752 point 1): OpenCode adapter records are not
             // Codex JSONL — they restore through the adapter's own checkpoint payload,
             // never through the Codex details/resume decoders.
-            guard !file.belongsToOpenCodeLocalHistory,
-                  let detailsData = file.scanState.detailsPayload,
-                  let details = try? decoder.decode(StoredFileDetails.self, from: detailsData)
-            else { continue }
+            guard !file.belongsToOpenCodeLocalHistory else { continue }
+            // A missing validated entry is invalid, not a request for another decode.
+            let details = decodedFileDetails.map { $0[file.path] } ?? file.scanState.detailsPayload.flatMap {
+                try? decoder.decode(StoredFileDetails.self, from: $0)
+            }
+            guard let details else { continue }
             let aggregates = (aggregatesByPath[file.path] ?? []).map(\.aggregate)
             let rows: [CostUsageScanner.CodexUsageRow]
             if let decodedUsageRows {

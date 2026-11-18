@@ -4,6 +4,24 @@ import Testing
 
 struct AppGroupSupportTests {
     @Test
+    func `ad hoc builds never request a protected app group container`() {
+        var requests = 0
+        let expected = URL(fileURLWithPath: "/synthetic/group")
+        for teamID in [nil, ""] as [String?] {
+            #expect(AppGroupSupport.containerURLForSignedTeam(teamID) {
+                requests += 1
+                return expected
+            } == nil)
+        }
+        #expect(requests == 0)
+        #expect(AppGroupSupport.containerURLForSignedTeam("ABCDE12345") {
+            requests += 1
+            return expected
+        } == expected)
+        #expect(requests == 1)
+    }
+
+    @Test
     func `app group identifiers use resolved team-prefixed release and debug variants`() {
         #expect(
             AppGroupSupport.currentGroupID(teamID: "Y5PE65HELJ", bundleID: "com.steipete.codexbar")
@@ -127,7 +145,7 @@ struct AppGroupSupportTests {
     }
 
     @Test
-    func `unavailable synthetic target does not mark migration complete`() throws {
+    func `ad hoc migration skips container lookup and does not mark migration complete`() throws {
         let fixture = try MigrationFixture()
         defer { fixture.cleanUp() }
 
@@ -137,7 +155,9 @@ struct AppGroupSupportTests {
         #expect(!result.copiedSnapshot)
         #expect(result.copiedDefaults == 0)
         #expect(fixture.standardDefaults.object(forKey: AppGroupSupport.migrationVersionKey) == nil)
-        #expect(fixture.fileManager.operations == [.containerLookup])
+        // The SwiftPM test executable has no signing Team ID. It must stop
+        // before even the stubbed container lookup, not request user consent.
+        #expect(fixture.fileManager.operations.isEmpty)
     }
 }
 
@@ -170,7 +190,7 @@ private struct MigrationFixture {
     }
 
     func migrate(currentDefaultsAvailable: Bool = true) -> AppGroupSupport.MigrationResult {
-        // nil is intentional only for the unavailable-target case: container lookup is stubbed to nil.
+        // nil exercises the unsigned runner's production container-access gate.
         AppGroupSupport.migrateLegacyDataIfNeeded(
             bundleID: "com.steipete.codexbar",
             standardDefaults: self.standardDefaults,

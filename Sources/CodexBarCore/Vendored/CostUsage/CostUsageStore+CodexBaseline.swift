@@ -3,6 +3,7 @@ import Foundation
 extension CostUsageStore {
     struct DecodedCodexUsageRows {
         var rowsByPath: [String: [CostUsageScanner.CodexUsageRow]] = [:]
+        var detailsByPath: [String: StoredFileDetails] = [:]
         var rowCounts: [String: Int] = [:]
     }
 
@@ -187,7 +188,8 @@ extension CostUsageStore {
                 recorder: self.scopedReadWorkRecorderForTesting,
                 tokenSnapshotsLoaded: tokenSnapshotsLoaded,
                 unloadedTokenSnapshotPathRecorder: { unloadedTokenSnapshotPaths.insert($0) },
-                decodedUsageRows: usageRows.rowsByPath),
+                decodedUsageRows: usageRows.rowsByPath,
+                decodedFileDetails: usageRows.detailsByPath),
             persistence: CodexPersistenceState(
                 snapshot: snapshot,
                 snapshotCounts: tokenSnapshotsLoaded ? nil :

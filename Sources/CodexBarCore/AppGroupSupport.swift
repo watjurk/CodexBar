@@ -84,10 +84,21 @@ public enum AppGroupSupport {
         -> URL?
     {
         #if os(macOS)
-        fileManager.containerURL(forSecurityApplicationGroupIdentifier: self.currentGroupID(for: bundleID))
+        return self.containerURLForSignedTeam(
+            self.codeSignatureTeamID(bundleURL: Bundle.main.bundleURL))
+        {
+            fileManager.containerURL(forSecurityApplicationGroupIdentifier: self.currentGroupID(for: bundleID))
+        }
         #else
         nil
         #endif
+    }
+
+    static func containerURLForSignedTeam(_ teamID: String?, resolve: () -> URL?) -> URL? {
+        // A plist fallback is not a signing identity. Ad-hoc builds cannot own
+        // the vendor's protected group; use the existing local snapshot fallback.
+        guard let teamID, !teamID.isEmpty else { return nil }
+        return resolve()
     }
 
     public static func snapshotURL(
