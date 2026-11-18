@@ -1,4 +1,4 @@
-name: Cache reader app validation
+name: Local CodexBar package
 
 on:
   push:
