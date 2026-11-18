@@ -4,6 +4,24 @@ import Testing
 
 struct AppGroupSupportTests {
     @Test
+    func `ad hoc builds never request a protected app group container`() {
+        var requests = 0
+        let expected = URL(fileURLWithPath: "/synthetic/group")
+        for teamID in [nil, ""] as [String?] {
+            #expect(AppGroupSupport.containerURLForSignedTeam(teamID) {
+                requests += 1
+                return expected
+            } == nil)
+        }
+        #expect(requests == 0)
+        #expect(AppGroupSupport.containerURLForSignedTeam("ABCDE12345") {
+            requests += 1
+            return expected
+        } == expected)
+        #expect(requests == 1)
+    }
+
+    @Test
     func `app group identifiers use resolved team-prefixed release and debug variants`() {
         #expect(
             AppGroupSupport.currentGroupID(teamID: "Y5PE65HELJ", bundleID: "com.steipete.codexbar")

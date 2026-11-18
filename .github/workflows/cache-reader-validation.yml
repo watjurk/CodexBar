@@ -20,8 +20,8 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Test cache store with full app targets
-        run: swift test --filter CostUsageStore
+      - name: Test app group access without requesting user permissions
+        run: swift test --filter AppGroupSupportTests
       - name: Package isolated arm64 app without developer keys
         env:
           ARCHES: arm64
